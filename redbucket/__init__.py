@@ -1,3 +1,5 @@
+"""Convenience imports for the redbucket package."""
+
 from redbucket.base import RateLimit, Zone
 from redbucket.in_memory import InMemoryRateLimiter
 

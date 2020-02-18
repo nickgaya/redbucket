@@ -1,3 +1,5 @@
+"""In-memory rate limiter implementation."""
+
 import contextlib
 import threading
 import time
@@ -9,15 +11,18 @@ _Req = namedtuple('_Req', ('rl', 'key'))
 
 class InMemoryRateLimiter:
     """
-    Thread-safe in-memory rate limiter to demonstrate the characteristics of
-    the leaky bucket algorithm.
+    Thread-safe in-memory rate limiter.
 
-    Note that the rate limiter stores zone state for all keys indefinitely,
-    making this implementation unsuitable for long-term production use.
+    This implementation is primarily intended to demonstrate the
+    characteristics of the rate limiting algorithm. The rate limiter stores
+    zone state for all keys indefinitely, making it unsuitable for long-term
+    production use.
     """
 
     def __init__(self, **rate_limits):
         """
+        Initialize an InMemoryRateLimiter instance.
+
         :param **rate_limits: Map of identifiers to rate limits.
         """
         zones = set()
@@ -70,6 +75,7 @@ class InMemoryRateLimiter:
         return True, delay
 
     def __repr__(self):
+        """Generate a string representation of this instance."""
         args = (f'{lname}={rl.limit!r}'
                 for lname, rl in self.rate_limits.items())
         return f"{self.__class__.__qualname__}({', '.join(args)})"

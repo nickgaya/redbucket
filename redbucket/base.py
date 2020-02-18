@@ -1,3 +1,5 @@
+"""Generic class definitions used across rate limiter implementations."""
+
 import sys
 from collections import namedtuple
 

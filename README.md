@@ -31,7 +31,8 @@ user_limit = RateLimit(user_zone, burst=10)
 ip_zone = Zone('ip', rate=20)
 ip_limit = RateLimit(ip_zone, delay=10)
 
-rate_limiter = InMemoryRateLimiter(user=user_limit, ip=ip_limit)
+rate_limiter = InMemoryRateLimiter()
+rate_limiter.configure(user=user_limit, ip=ip_limit)
 ```
 
 We can now use the rate limiter as follows:

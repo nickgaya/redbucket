@@ -14,12 +14,12 @@ To install the current development version from the master branch on GitHub:
 
 ## Usage
 
-<!-- TODO: Change examples to use Redis-based rate limiter -->
-
 The following snippet configures a rate limiter with two rate limiting zones:
 
 ```python3
-from redbucket import InMemoryRateLimiter, RateLimit, Zone
+from redbucket import RedisRateLimiter, RateLimit, Zone
+from redis import Redis
+
 
 # Accept up to 5 requests per user per second.
 # Allow bursts of up to 10 requests.
@@ -31,7 +31,8 @@ user_limit = RateLimit(user_zone, burst=10)
 ip_zone = Zone('ip', rate=20)
 ip_limit = RateLimit(ip_zone, delay=10)
 
-rate_limiter = InMemoryRateLimiter()
+redis = Redis()
+rate_limiter = RedisRateLimiter(redis)
 rate_limiter.configure(user=user_limit, ip=ip_limit)
 ```
 
@@ -153,3 +154,17 @@ difference.
 
 This project uses Tox to manage virtual environments for unit tests and other
 checks. Unit tests are written using the Pytest framework.
+
+The unit tests require a Redis instance. By default, the tests attempt to
+connect to port 6379 of localhost. This can be overridden by setting the
+environment variables `REDIS_HOST` and `REDIS_PORT`.
+
+    export REDIS_HOST=localhost
+    export REDIS_PORT=6379
+
+To start a Redis Docker container for running the tests, you can use the
+*docker_redis.sh* script. The script expects an argument specifying the Docker
+tag or repository, followed by the command to execute. For example, to run the
+tests with against the `redis:alpine` image, use:
+
+    docker_redis.sh alpine tox

@@ -31,5 +31,8 @@ setup(
     setup_requires=[
         'setuptools_scm',
     ],
-    python_requires='>=3.6,<4',
+    python_requires='~=3.6',
+    install_requires=[
+        'redis~=3.0',
+    ],
 )

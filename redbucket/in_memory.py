@@ -5,7 +5,7 @@ import threading
 import time
 from collections import namedtuple
 
-from redbucket.base import RateLimiter
+from redbucket.base import RateLimiter, State
 
 ZoneState = namedtuple('ZoneState', ('state', 'lock'))
 Req = namedtuple('Req', ('limit', 'zstate', 'key'))
@@ -51,7 +51,7 @@ class InMemoryRateLimiter(RateLimiter):
                     return False, None
                 if c < 0:
                     delay = max(delay, -c/limit.zone.rate)
-                states.append((t1, v1))
+                states.append(State(t1, v1))
 
             for req, state in zip(reqs, states):
                 req.zstate.state[req.key] = state

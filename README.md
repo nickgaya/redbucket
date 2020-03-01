@@ -61,6 +61,14 @@ def example_operation(user, ip_address):
     ...
 ```
 
+### State encoding
+
+By default, rate limiter state is stored in Redis using a packed binary
+representation. You can switch to JSON for a less efficient but more
+human-readable encoding.
+
+    rate_limiter = RedisRateLimiter(redis, codec='json')
+
 ## Rate limiting model
 
 Red Bucket uses a rate limiting model inspired by [Nginx][rate-limiting-nginx].

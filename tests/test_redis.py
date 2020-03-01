@@ -1,4 +1,3 @@
-import json
 import time
 from unittest.mock import NonCallableMock, call
 
@@ -8,6 +7,8 @@ from redis import Redis
 from redis.client import Pipeline
 
 from redbucket import RedisRateLimiter, RateLimit, Zone
+from redbucket.base import State
+from redbucket.codecs import Codec
 
 T0 = 1582534960.134661
 
@@ -43,16 +44,12 @@ def _to_redis_time(timestamp):
     return s, us
 
 
-class EncodedState:
-    def __init__(self, t, v):
-        self.t = t
-        self.v = v
+class DummyCodec(Codec):
+    def encode(self, state):
+        return state
 
-    def __eq__(self, other):
-        return json.loads(other.decode('utf8')) == {'t': self.t, 'v': self.v}
-
-    def __repr__(self):
-        return f'<t={self.t!r}, v={self.v!r}>'
+    def decode(self, raw_state):
+        return raw_state or None
 
 
 @pytest.mark.parametrize('format_string', (
@@ -81,7 +78,7 @@ def test_valid_key_format(mock_redis, format_string):
 
 
 def test_request_mock_redis(mock_redis, mock_pipeline):
-    rl = RedisRateLimiter(mock_redis)
+    rl = RedisRateLimiter(mock_redis, codec=DummyCodec())
     rl.configure(k1=RateLimit(Zone('z1', 2)),
                  k2=RateLimit(Zone('z2', 1, expiry=10)))
 
@@ -96,8 +93,7 @@ def test_request_mock_redis(mock_redis, mock_pipeline):
     assert rl.request(k1='bar', k2='baz') == (True, 0)
 
     t2 = T0 + 0.3
-    mock_pipeline.mget.return_value = [
-        json.dumps({'t': t0, 'v': 1}).encode('utf8')]
+    mock_pipeline.mget.return_value = [State(t0, 1)]
     mock_pipeline.time.return_value = _to_redis_time(t2)
     assert rl.request(k1='foo') == (False, None)
 
@@ -111,15 +107,15 @@ def test_request_mock_redis(mock_redis, mock_pipeline):
         call.mget(['redbucket:z1:foo']),
         call.time(),
         call.multi(),
-        call.setex('redbucket:z1:foo', 60, EncodedState(approx(t0), 1)),
+        call.setex('redbucket:z1:foo', 60, State(approx(t0), 1)),
         call.execute(),
         # request 2
         call.watch('redbucket:z1:bar', 'redbucket:z2:baz'),
         call.mget(['redbucket:z1:bar', 'redbucket:z2:baz']),
         call.time(),
         call.multi(),
-        call.setex('redbucket:z1:bar', 60, EncodedState(approx(t1), 1)),
-        call.setex('redbucket:z2:baz', 10, EncodedState(approx(t1), 1)),
+        call.setex('redbucket:z1:bar', 60, State(approx(t1), 1)),
+        call.setex('redbucket:z2:baz', 10, State(approx(t1), 1)),
         call.execute(),
         # request 3
         call.watch('redbucket:z1:foo'),
@@ -132,13 +128,14 @@ def test_request_mock_redis(mock_redis, mock_pipeline):
         call.mget(['redbucket:z1:foo']),
         call.time(),
         call.multi(),
-        call.setex('redbucket:z1:foo', 60, EncodedState(approx(t3), 1)),
+        call.setex('redbucket:z1:foo', 60, State(approx(t3), 1)),
         call.execute(),
     ]
 
 
-def test_state_initial(redis, key_format):
-    rl = RedisRateLimiter(redis, key_format=key_format)
+@pytest.mark.parametrize('codec', ('json', 'struct'))
+def test_state(redis, key_format, codec):
+    rl = RedisRateLimiter(redis, key_format=key_format, codec=codec)
     rl.configure(k1=RateLimit(Zone('z1', 1)), k2=RateLimit(Zone('z2', 1)))
 
     assert rl.request(k1='foo') == (True, 0)
@@ -148,12 +145,14 @@ def test_state_initial(redis, key_format):
     assert rl.request(k1='bar', k2='baz') == (True, 0)
     t1 = _redis_time(redis)
 
-    assert redis.get(key_format.format(zone='z1', key='foo')) \
-        == EncodedState(approx(t0), 1)
-    assert redis.get(key_format.format(zone='z1', key='bar')) \
-        == EncodedState(approx(t1), 1)
-    assert redis.get(key_format.format(zone='z2', key='baz')) \
-        == EncodedState(approx(t1), 1)
+    time.sleep(0.1)
+    assert rl.request(k1='foo') == (False, None)
+    assert rl.request(k1='bar') == (False, None)
+    assert rl.request(k2='baz') == (False, None)
+
+    assert rl._get_state('z1', 'foo') == approx((t0, 1))
+    assert rl._get_state('z1', 'bar') == approx((t1, 1))
+    assert rl._get_state('z2', 'baz') == approx((t1, 1))
 
 
 def test_state_burst(redis, key_format):
@@ -162,7 +161,7 @@ def test_state_burst(redis, key_format):
 
     assert rl.request(k1='foo') == (True, 0)
     t0 = _redis_time(redis)
-    assert rl._get_state('z1', 'foo') == (approx(t0, abs=0.05), 1)
+    assert rl._get_state('z1', 'foo') == approx((t0, 1), abs=0.05)
 
     time.sleep(0.1)
     assert rl.request(k1='foo') == (True, 0)
@@ -181,7 +180,7 @@ def test_state_delay(redis, key_format):
 
     assert rl.request(k1='foo') == (True, 0)
     t0 = _redis_time(redis)
-    assert rl._get_state('z1', 'foo') == (approx(t0, abs=0.05), 1)
+    assert rl._get_state('z1', 'foo') == approx((t0, 1), abs=0.05)
 
     time.sleep(0.1)
     assert rl.request(k1='foo') == (True, approx(0.9, abs=0.05))

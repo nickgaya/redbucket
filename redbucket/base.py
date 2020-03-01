@@ -28,6 +28,11 @@ RateLimit.zone.__doc__ = 'Rate limiting zone'
 RateLimit.burst.__doc__ = 'Maximum burst with no delay'
 RateLimit.delay.__doc__ = 'Maximum burst with delay'
 
+State = namedtuple('State', ('timestamp', 'value'))
+State.__doc__ += ': Internal rate limiting state'
+State.timestamp.__doc__ = 'Unix timestamp of last update'
+State.value.__doc__ = 'Time-adjusted request count'
+
 
 class RateLimiter(ABC):
     """Abstract base class for rate limiter implementations."""

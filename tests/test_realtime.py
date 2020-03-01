@@ -7,7 +7,8 @@ import time
 import pytest
 from pytest import approx
 
-from redbucket import InMemoryRateLimiter, RedisRateLimiter, RateLimit, Zone
+from redbucket import (InMemoryRateLimiter, RedisScriptRateLimiter,
+                       RedisTransactionalRateLimiter, RateLimit, Zone)
 
 
 @pytest.fixture
@@ -16,11 +17,16 @@ def in_memory_rate_limiter():
 
 
 @pytest.fixture
-def redis_rate_limiter(redis, key_format):
-    return RedisRateLimiter(redis, key_format=key_format)
+def redis_tx_rate_limiter(redis, key_format):
+    return RedisTransactionalRateLimiter(redis, key_format=key_format)
 
 
-@pytest.fixture(params=('in_memory', 'redis'))
+@pytest.fixture
+def redis_script_rate_limiter(redis, key_format):
+    return RedisScriptRateLimiter(redis, key_format=key_format)
+
+
+@pytest.fixture(params=('in_memory', 'redis_tx', 'redis_script'))
 def rate_limiter(request):
     return request.getfixturevalue(f'{request.param}_rate_limiter')
 

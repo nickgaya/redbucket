@@ -1,20 +1,20 @@
-"""Redis-based rate limiter implementation."""
+"""Transactional Redis-based rate limiter implementation."""
 
-from string import Formatter
 from typing import Any, List, Mapping, Optional, Union
 
 from redis import Redis
 from redis.client import Pipeline
 
-from redbucket.base import RateLimit, RateLimiter, Response, State
-from redbucket.codecs import Codec, get_codec
+from redbucket.base import RedisRateLimiter
+from redbucket.codecs import DEFAULT_CODEC, Codec, get_codec
+from redbucket.data import RateLimit, Response, State
 
-DEFAULT_CODEC = 'struct'
+__all__ = ('RedisTransactionalRateLimiter',)
 
 
-class RedisRateLimiter(RateLimiter):
+class RedisTransactionalRateLimiter(RedisRateLimiter):
     """
-    Redis-based rate limiter.
+    Transactional Redis-based rate limiter.
 
     Zone state is stored in Redis. The implementation uses Redis transactions
     to atomically update zone state for each request.
@@ -24,20 +24,16 @@ class RedisRateLimiter(RateLimiter):
                  key_format: str = 'redbucket:{zone}:{key}',
                  codec: Union[str, Codec] = DEFAULT_CODEC) -> None:
         """
-        Initialize a RedisRateLimiter instance.
+        Initialize a RedisTransactionalRateLimiter instance.
 
         :param redis: Redis client
         :param key_format: Redis key format. Must contain replacement fields
             'zone' and 'key'.
         :param codec: Codec name or instance
         """
-        super(RedisRateLimiter, self).__init__()
-        self._redis = redis
-        self._key_format = _validate_key_format(key_format)
-        self._codec = get_codec(codec) if isinstance(codec, str) else codec
-
-    def _redis_key(self, zone: Any, key: Any) -> str:
-        return self._key_format.format(zone=zone, key=key)
+        super(RedisTransactionalRateLimiter, self).__init__(redis, key_format)
+        self._codec: Codec = \
+            get_codec(codec) if isinstance(codec, str) else codec
 
     def _request(self, keys: Mapping[str, Any]) -> Response:
         limits: List[RateLimit] = []
@@ -82,17 +78,3 @@ class RedisRateLimiter(RateLimiter):
 
     def _get_state(self, zname: Any, key: Any) -> Optional[State]:
         return self._codec.decode(self._redis.get(self._redis_key(zname, key)))
-
-
-def _validate_key_format(format_string: str) -> str:
-    """Make sure that the given key format string has the correct fields."""
-    field_names = {ft[1] for ft in Formatter().parse(format_string)}
-    field_names.discard(None)
-    expected = {'zone', 'key'}
-    if any(name not in field_names for name in expected):
-        raise ValueError("Key format string must contain replacement fields "
-                         "'zone' and 'key'")
-    if field_names != expected:
-        raise ValueError("Key format string can only contain replacement "
-                         "'zone' and 'key'")
-    return format_string

@@ -2,8 +2,8 @@ import time
 
 import pytest
 
-from redbucket.base import State
 from redbucket.codecs import get_codec
+from redbucket.data import State
 
 
 @pytest.fixture(params=('json', 'struct'))

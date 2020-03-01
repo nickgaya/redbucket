@@ -61,6 +61,17 @@ def example_operation(user, ip_address):
     ...
 ```
 
+### Implementations
+
+The default `RedisRateLimiter` uses Redis's Lua script engine to atomically
+update rate limiter state. This implementation requires Redis 3.2 or greater.
+For older Redis versions, you can use the `RedisTransactionalRateLimiter`.
+
+Where supported, the script-based implementation is recommended as it handles
+each rate limiting request in a single round-trip to the Redis server, whereas
+the transactional implementation performs several consecutive Redis commands
+per request.
+
 ### State encoding
 
 By default, rate limiter state is stored in Redis using a packed binary

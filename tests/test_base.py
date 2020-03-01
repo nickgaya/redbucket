@@ -1,6 +1,9 @@
+from unittest.mock import NonCallableMock
+
 import pytest
 
-from redbucket.base import RateLimit, RateLimiter, Zone
+from redbucket.base import RateLimiter, RedisRateLimiter
+from redbucket.data import RateLimit, Zone
 
 
 class DummyRateLimiter(RateLimiter):
@@ -57,3 +60,40 @@ def test_expiry_warning():
     assert str(rec[0].message) == ("Expiry for zone 'z1' is less than "
                                    "recommended minimum for limit 'k1': "
                                    "expiry=5, recommended=6")
+
+
+class DummyRedisRateLimiter(RedisRateLimiter):
+    def _request(self, **keys):
+        for lname in keys:
+            self._rate_limits[lname]
+        return False, None
+
+
+@pytest.fixture
+def mock_redis():
+    return NonCallableMock(name='redis')
+
+
+@pytest.mark.parametrize('format_string', (
+    'invalid {',
+    'no fields',
+    '{zone} no key',
+    'no zone {key}',
+    '{zone} {key} extra {}',
+    '{zone} {key} {extra}',
+    '{zone} {key} extra {0}',
+))
+def test_invalid_key_format(mock_redis, format_string):
+    with pytest.raises(ValueError):
+        DummyRedisRateLimiter(mock_redis, key_format=format_string)
+
+
+@pytest.mark.parametrize('format_string', (
+    '{zone}{key}',
+    '{key}{zone}',
+    '{zone}{key}{zone}',
+    '{zone!r}{key}',
+    '{{{zone}{key}}}',
+))
+def test_valid_key_format(mock_redis, format_string):
+    DummyRedisRateLimiter(mock_redis, key_format=format_string)

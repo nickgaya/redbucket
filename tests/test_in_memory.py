@@ -4,7 +4,8 @@ from unittest import mock
 import pytest
 from pytest import approx
 
-from redbucket import InMemoryRateLimiter, RateLimit, Zone
+from redbucket.data import RateLimit, Zone
+from redbucket.in_memory import InMemoryRateLimiter
 
 T0 = 123.4
 

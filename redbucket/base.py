@@ -1,57 +1,15 @@
-"""Generic class definitions used across rate limiter implementations."""
+"""Rate limiter base classes."""
 
 import math
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Mapping, NamedTuple, Optional, Set
+from string import Formatter
+from typing import Any, Mapping, Set
 
+from redis import Redis
+from redbucket.data import RateLimit, Response
 
-class Zone(NamedTuple):
-    """Namespace for rate limiting state."""
-
-    name: Any
-    rate: float
-    expiry: int = 60
-
-
-Zone.name.__doc__ = 'Unique identifier for this zone'
-Zone.rate.__doc__ = 'Rate limit in requests per second'
-Zone.expiry.__doc__ = 'Zone expiry in seconds'
-
-
-class RateLimit(NamedTuple):
-    """Rate limit for a given zone."""
-
-    zone: Zone
-    burst: float = 0
-    delay: float = 0
-
-
-RateLimit.zone.__doc__ = 'Rate limiting zone'
-RateLimit.burst.__doc__ = 'Maximum burst with no delay'
-RateLimit.delay.__doc__ = 'Maximum burst with delay'
-
-
-class State(NamedTuple):
-    """Internal rate limiting state."""
-
-    timestamp: float
-    value: float
-
-
-State.timestamp.__doc__ = 'Unix timestamp of last update'
-State.value.__doc__ = 'Time-adjusted request count'
-
-
-class Response(NamedTuple):
-    """Response to a rate limiter request."""
-
-    accepted: bool
-    delay: Optional[float]
-
-
-Response.accepted.__doc__ = 'Whether the request was accepted'
-Response.delay.__doc__ = 'Amount of time to delay the request'
+__all__ = ('RateLimiter', 'RedisRateLimiter')
 
 
 class RateLimiter(ABC):
@@ -113,3 +71,37 @@ class RateLimiter(ABC):
     @abstractmethod
     def _request(self, keys: Mapping[str, Any]) -> Response:
         ...
+
+
+class RedisRateLimiter(RateLimiter):
+    """Base class for Redis-based rate limiters."""
+
+    def __init__(self, redis: Redis,
+                 key_format: str = 'redbucket:{zone}:{key}') -> None:
+        """
+        Initialize a RedisRateLimiter instance.
+
+        :param redis: Redis client
+        :param key_format: Redis key format. Must contain replacement fields
+            'zone' and 'key'.
+        """
+        super(RedisRateLimiter, self).__init__()
+        self._redis = redis
+        self._key_format = _validate_key_format(key_format)
+
+    def _redis_key(self, zone: Any, key: Any) -> str:
+        return self._key_format.format(zone=zone, key=key)
+
+
+def _validate_key_format(format_string: str) -> str:
+    """Make sure that the given key format string has the correct fields."""
+    field_names = {ft[1] for ft in Formatter().parse(format_string)}
+    field_names.discard(None)
+    expected = {'zone', 'key'}
+    if any(name not in field_names for name in expected):
+        raise ValueError("Key format string must contain replacement fields "
+                         "'zone' and 'key'")
+    if field_names != expected:
+        raise ValueError("Key format string can only contain replacement "
+                         "'zone' and 'key'")
+    return format_string

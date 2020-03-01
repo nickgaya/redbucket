@@ -5,7 +5,10 @@ import threading
 import time
 from typing import Any, Dict, List, Mapping, NamedTuple
 
-from redbucket.base import RateLimit, RateLimiter, Response, State
+from redbucket.base import RateLimiter
+from redbucket.data import RateLimit, Response, State
+
+__all__ = ('InMemoryRateLimiter',)
 
 
 class _ZoneState(NamedTuple):

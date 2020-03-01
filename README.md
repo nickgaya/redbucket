@@ -40,11 +40,11 @@ We can now use the rate limiter as follows:
 
 ```python3
 def example_operation(user, ip_address):
-    accepted, delay = rate_limiter.request(user=user, ip=ip_address)
-    if not accepted:
+    response = rate_limiter.request(user=user, ip=ip_address)
+    if not response.accepted:
         raise Exception("Rate limit exceeded")  # Reject request
-    if delay > 0:
-        sleep(delay)  # Wait for delay seconds
+    if response.delay > 0:
+        sleep(response.delay)  # Wait for delay seconds
     ...  # Perform operation
 ```
 
@@ -55,9 +55,9 @@ user rate limit, as follows:
 ```python3
 def example_operation(user, ip_address):
     if is_whitelisted(ip_address):
-        accepted, delay = rate_limiter.acquire(user=user)
+        response = rate_limiter.acquire(user=user)
     else:
-        accepted, delay = rate_limiter.acquire(user=user, ip=ip_address)
+        response = rate_limiter.acquire(user=user, ip=ip_address)
     ...
 ```
 

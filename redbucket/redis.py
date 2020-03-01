@@ -2,7 +2,7 @@
 
 from string import Formatter
 
-from redbucket.base import RateLimiter, State
+from redbucket.base import RateLimiter, Response, State
 from redbucket.codecs import get_codec
 
 DEFAULT_CODEC = 'struct'
@@ -57,7 +57,7 @@ class RedisRateLimiter(RateLimiter):
                 c = limit.burst + 1 - v1
                 if c < -limit.delay:
                     pipeline.unwatch()
-                    return False, None
+                    return Response(False, None)
                 if c < 0:
                     delay = max(delay, -c/limit.zone.rate)
                 states.append(State(t1, v1))
@@ -67,7 +67,7 @@ class RedisRateLimiter(RateLimiter):
                 pipeline.setex(rkey, limit.zone.expiry,
                                self._codec.encode(state))
 
-            return True, delay
+            return Response(True, delay)
 
         return self._redis.transaction(tx_fn, *rkeys, value_from_callable=True)
 

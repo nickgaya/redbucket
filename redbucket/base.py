@@ -33,6 +33,11 @@ State.__doc__ += ': Internal rate limiting state'
 State.timestamp.__doc__ = 'Unix timestamp of last update'
 State.value.__doc__ = 'Time-adjusted request count'
 
+Response = namedtuple('Response', ('accepted', 'delay'))
+Response.__doc__ += ': Response to a rate limiter request'
+Response.accepted.__doc__ = 'Whether the request was accepted'
+Response.delay.__doc__ = 'Amount of time to delay the request'
+
 
 class RateLimiter(ABC):
     """Abstract base class for rate limiter implementations."""

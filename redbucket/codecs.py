@@ -3,6 +3,7 @@
 import json as _json
 import struct
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from redbucket.base import State
 
@@ -11,7 +12,7 @@ class Codec(ABC):
     """Abstract codec base class."""
 
     @abstractmethod
-    def encode(self, state):
+    def encode(self, state: State) -> bytes:
         """
         Encode a state to bytes.
 
@@ -21,7 +22,7 @@ class Codec(ABC):
         ...
 
     @abstractmethod
-    def decode(self, raw_state):
+    def decode(self, raw_state: Optional[bytes]) -> Optional[State]:
         """
         Decode a state from bytes.
 
@@ -32,49 +33,47 @@ class Codec(ABC):
 
 
 class JsonCodec(Codec):
-    """Codec for encoding state to UTF8-encoded JSON data."""
+    """
+    Codec for encoding state to UTF8-encoded JSON data.
+
+    Note: By default, this class uses the standard library json module. To use
+    a different JSON implementation, set the `json` attribute of the class or
+    instance.
+    """
 
     timestamp_key = 't'
     value_key = 'v'
+    json = _json
 
-    def __init__(self, json=_json):
-        """
-        Initialize a JsonCodec.
-
-        :param json: JSON implementation. Defaults to the standard library
-            json module.
-        """
-        self._json = json
-
-    def encode(self, state):
+    def encode(self, state: State) -> bytes:
         """Encode a state to bytes."""
-        return self._json.dumps({self.timestamp_key: state.timestamp,
-                                 self.value_key: state.value},
-                                separators=(',', ':')).encode('utf-8')
+        return self.json.dumps({self.timestamp_key: state.timestamp,
+                                self.value_key: state.value},
+                               separators=(',', ':')).encode('utf-8')
 
-    def decode(self, raw_state):
+    def decode(self, raw_state: Optional[bytes]) -> Optional[State]:
         """Decode a state from bytes."""
         if not raw_state:
             return None
-        data = self._json.loads(raw_state.decode('utf-8'))
+        data = self.json.loads(raw_state.decode('utf-8'))
         return State(data[self.timestamp_key], data[self.value_key])
 
 
 class StructCodec(Codec):
     """Codec for encoding state to packed binary data."""
 
-    def encode(self, state):
+    def encode(self, state: State) -> bytes:
         """Encode a state to bytes."""
         return struct.pack('<dd', state.timestamp, state.value)
 
-    def decode(self, raw_state):
+    def decode(self, raw_state: Optional[bytes]) -> Optional[State]:
         """Decode a state from bytes."""
         if not raw_state:
             return None
         return State(*struct.unpack('<dd', raw_state))
 
 
-def get_codec(name):
+def get_codec(name: str) -> Codec:
     """
     Get codec by name.
 

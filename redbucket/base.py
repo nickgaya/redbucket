@@ -1,40 +1,55 @@
 """Generic class definitions used across rate limiter implementations."""
 
-import collections
 import math
-import sys
 import warnings
 from abc import ABC, abstractmethod
+from typing import Any, Mapping, NamedTuple, Optional, Set
 
-if sys.version_info >= (3, 7):
-    namedtuple = collections.namedtuple
-else:
-    def namedtuple(typename, field_names, *, defaults=None):
-        """Create a namedtuple with default field values."""
-        cls = collections.namedtuple(typename, field_names)
-        cls.__new__.__defaults__ = defaults
-        return cls
 
-Zone = namedtuple('Zone', ('name', 'rate', 'expiry'), defaults=(60,))
-Zone.__doc__ += ': Namespace for rate limiting state'
+class Zone(NamedTuple):
+    """Namespace for rate limiting state."""
+
+    name: Any
+    rate: float
+    expiry: int = 60
+
+
 Zone.name.__doc__ = 'Unique identifier for this zone'
 Zone.rate.__doc__ = 'Rate limit in requests per second'
 Zone.expiry.__doc__ = 'Zone expiry in seconds'
 
-RateLimit = namedtuple('RateLimit', ('zone', 'burst', 'delay'),
-                       defaults=(0, 0))
-RateLimit.__doc__ += ': Rate limit for a given zone'
+
+class RateLimit(NamedTuple):
+    """Rate limit for a given zone."""
+
+    zone: Zone
+    burst: float = 0
+    delay: float = 0
+
+
 RateLimit.zone.__doc__ = 'Rate limiting zone'
 RateLimit.burst.__doc__ = 'Maximum burst with no delay'
 RateLimit.delay.__doc__ = 'Maximum burst with delay'
 
-State = namedtuple('State', ('timestamp', 'value'))
-State.__doc__ += ': Internal rate limiting state'
+
+class State(NamedTuple):
+    """Internal rate limiting state."""
+
+    timestamp: float
+    value: float
+
+
 State.timestamp.__doc__ = 'Unix timestamp of last update'
 State.value.__doc__ = 'Time-adjusted request count'
 
-Response = namedtuple('Response', ('accepted', 'delay'))
-Response.__doc__ += ': Response to a rate limiter request'
+
+class Response(NamedTuple):
+    """Response to a rate limiter request."""
+
+    accepted: bool
+    delay: Optional[float]
+
+
 Response.accepted.__doc__ = 'Whether the request was accepted'
 Response.delay.__doc__ = 'Amount of time to delay the request'
 
@@ -42,11 +57,11 @@ Response.delay.__doc__ = 'Amount of time to delay the request'
 class RateLimiter(ABC):
     """Abstract base class for rate limiter implementations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize a RateLimiter instance."""
         self._configured = False
 
-    def configure(self, **rate_limits):
+    def configure(self, **rate_limits: RateLimit) -> None:
         """
         Configure rate limits for this rate limiter.
 
@@ -60,8 +75,8 @@ class RateLimiter(ABC):
         self._configure(rate_limits)
         self._configured = True
 
-    def _validate(self, rate_limits):
-        zones = set()
+    def _validate(self, rate_limits: Mapping[str, RateLimit]) -> None:
+        zones: Set[str] = set()
         for lname, limit in rate_limits.items():
             if limit.zone.name in zones:
                 raise ValueError("Multiple rate limits for zone "
@@ -77,10 +92,10 @@ class RateLimiter(ABC):
                               f"expiry={limit.zone.expiry}, "
                               f"recommended={recommended}")
 
-    def _configure(self, rate_limits):
+    def _configure(self, rate_limits: Mapping[str, RateLimit]) -> None:
         pass
 
-    def request(self, **keys):
+    def request(self, **keys: Any) -> Response:
         """
         Request a permit from the rate limiter.
 
@@ -96,5 +111,5 @@ class RateLimiter(ABC):
         return self._request(keys)
 
     @abstractmethod
-    def _request(self, keys):
+    def _request(self, keys: Mapping[str, Any]) -> Response:
         ...

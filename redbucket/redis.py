@@ -1,9 +1,13 @@
 """Redis-based rate limiter implementation."""
 
 from string import Formatter
+from typing import Any, List, Mapping, Optional, Union
 
-from redbucket.base import RateLimiter, Response, State
-from redbucket.codecs import get_codec
+from redis import Redis
+from redis.client import Pipeline
+
+from redbucket.base import RateLimit, RateLimiter, Response, State
+from redbucket.codecs import Codec, get_codec
 
 DEFAULT_CODEC = 'struct'
 
@@ -16,8 +20,9 @@ class RedisRateLimiter(RateLimiter):
     to atomically update zone state for each request.
     """
 
-    def __init__(self, redis, key_format='redbucket:{zone}:{key}',
-                 codec=DEFAULT_CODEC):
+    def __init__(self, redis: Redis,
+                 key_format: str = 'redbucket:{zone}:{key}',
+                 codec: Union[str, Codec] = DEFAULT_CODEC) -> None:
         """
         Initialize a RedisRateLimiter instance.
 
@@ -31,26 +36,28 @@ class RedisRateLimiter(RateLimiter):
         self._key_format = _validate_key_format(key_format)
         self._codec = get_codec(codec) if isinstance(codec, str) else codec
 
-    def _redis_key(self, zone, key):
+    def _redis_key(self, zone: Any, key: Any) -> str:
         return self._key_format.format(zone=zone, key=key)
 
-    def _request(self, keys):
-        limits = []
-        rkeys = []
+    def _request(self, keys: Mapping[str, Any]) -> Response:
+        limits: List[RateLimit] = []
+        rkeys: List[str] = []
         for lname, key in keys.items():
             limit = self._rate_limits[lname]
             limits.append(limit)
             rkeys.append(self._redis_key(limit.zone.name, key))
 
-        def tx_fn(pipeline):
+        def tx_fn(pipeline: Pipeline) -> Response:
             """Code to be executed within a Redis transaction."""
-            rstates = pipeline.mget(rkeys)
+            rstates: List[Optional[bytes]] = pipeline.mget(rkeys)
 
+            t_s: int
+            t_us: int
             t_s, t_us = pipeline.time()
             t1 = t_s + t_us / 1000000
 
-            delay = 0
-            states = []
+            delay: float = 0
+            states: List[State] = []
             for limit, rstate in zip(limits, rstates):
                 t0, v0 = self._codec.decode(rstate) or (t1, 0)
                 v1 = max(v0 - (t1 - t0) * limit.zone.rate, 0) + 1
@@ -69,13 +76,15 @@ class RedisRateLimiter(RateLimiter):
 
             return Response(True, delay)
 
-        return self._redis.transaction(tx_fn, *rkeys, value_from_callable=True)
+        response: Response = self._redis.transaction(
+            tx_fn, *rkeys, value_from_callable=True)
+        return response
 
-    def _get_state(self, zname, key):
+    def _get_state(self, zname: Any, key: Any) -> Optional[State]:
         return self._codec.decode(self._redis.get(self._redis_key(zname, key)))
 
 
-def _validate_key_format(format_string):
+def _validate_key_format(format_string: str) -> str:
     """Make sure that the given key format string has the correct fields."""
     field_names = {ft[1] for ft in Formatter().parse(format_string)}
     field_names.discard(None)

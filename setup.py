@@ -17,6 +17,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     packages=["redbucket"],
+    package_data={'redbucket': ['py.typed']},
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
@@ -35,4 +36,7 @@ setup(
     install_requires=[
         'redis~=3.0',
     ],
+    # Ensure MyPy can detect the py.typed file
+    # https://mypy.readthedocs.io/en/latest/installed_packages.html
+    zip_safe=False,
 )

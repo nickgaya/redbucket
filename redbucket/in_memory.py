@@ -39,6 +39,9 @@ class InMemoryRateLimiter(RateLimiter):
         }
 
     def _request(self, keys: Mapping[str, Any]) -> Response:
+        if not keys:
+            return Response(True, 0)
+
         reqs: List[_Req] = []
         for lname, key in keys.items():
             limit = self._rate_limits[lname]

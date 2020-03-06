@@ -129,6 +129,9 @@ class RedisScriptRateLimiter(RedisRateLimiter):
         self._get_script: Script = self._redis.register_script(get_script)
 
     def _request(self, keys: Mapping[str, Any]) -> Response:
+        if not keys:
+            return Response(True, 0)
+
         rkeys: List[str] = []
         args: List[str] = []
         for lname, key in keys.items():

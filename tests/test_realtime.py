@@ -161,3 +161,8 @@ def test_request_invalid_key(rate_limiter):
         rate_limiter.request(k2='bar')
 
     assert str(ei.value) == repr('k2')
+
+
+def test_request_no_keys(rate_limiter):
+    rate_limiter.configure(k1=RateLimit(Zone('z1', 1)))
+    assert rate_limiter.request() == (True, 0)

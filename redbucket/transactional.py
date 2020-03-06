@@ -36,6 +36,9 @@ class RedisTransactionalRateLimiter(RedisRateLimiter):
             get_codec(codec) if isinstance(codec, str) else codec
 
     def _request(self, keys: Mapping[str, Any]) -> Response:
+        if not keys:
+            return Response(True, 0)
+
         limits: List[RateLimit] = []
         rkeys: List[str] = []
         for lname, key in keys.items():

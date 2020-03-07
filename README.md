@@ -176,14 +176,13 @@ checks. Unit tests are written using the Pytest framework.
 
 The unit tests require a Redis instance. By default, the tests attempt to
 connect to port 6379 of localhost. This can be overridden by setting the
-environment variables `REDIS_HOST` and `REDIS_PORT`.
+`REDIS_URL` environment variable.
 
-    export REDIS_HOST=localhost
-    export REDIS_PORT=6379
+    export REDIS_URL=redis://localhost:6379
 
 To start a Redis Docker container for running the tests, you can use the
 *docker_redis.sh* script. The script expects an argument specifying the Docker
 tag or repository, followed by the command to execute. For example, to run the
-tests with against the `redis:alpine` image, use:
+tests with the `redis:alpine` image, use:
 
     docker_redis.sh alpine tox

@@ -6,8 +6,8 @@ from redis import Redis
 
 @pytest.fixture(scope='session')
 def redis():
-    redis = Redis(host=os.environ.get('REDIS_HOST', 'localhost'),
-                  port=int(os.environ.get('REDIS_PORT', 6379)))
+    redis = Redis.from_url(
+        os.environ.get('REDIS_URL', 'redis://localhost'))
     redis.ping()
     redis.setnx('rb:test_id', 0)
     assert redis.expire('rb:test_id', 300)

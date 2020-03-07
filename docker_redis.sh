@@ -40,6 +40,5 @@ port="${hp##*:}"
 echo "Redis container started: id=${container:0:12}, port=${port}" >&2
 
 # Set envvars and execute command
-export REDIS_HOST='127.0.0.1'
-export REDIS_PORT="${port}"
+export REDIS_URL="redis://localhost:${port}"
 "${@}"

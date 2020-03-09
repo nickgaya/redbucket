@@ -1,0 +1,41 @@
+language: python
+
+jobs:
+  include:
+    - env: TOXENV=py38
+      python: '3.8'
+      services:
+        - redis-server
+
+    - env: TOXENV=py37
+      python: '3.7'
+      services:
+        - redis-server
+
+    - env: TOXENV=py36
+      python: '3.6'
+      services:
+        - redis-server
+
+    - env: TOXENV=py38 REDIS_TAG=5-alpine
+      python: 3.8
+      services:
+        - docker
+
+    - env: TOXENV=py38 REDIS_TAG=4-alpine
+      python: 3.8
+      services:
+        - docker
+
+    - env: TOXENV=py38 REDIS_TAG=3-alpine
+      python: 3.8
+      services:
+        - docker
+
+    - env: TOXENV=py38 REDIS_TAG=2.6.17
+      python: 3.8
+      services:
+        - docker
+
+install: pip install tox
+script: ./travis.sh

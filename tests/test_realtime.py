@@ -22,7 +22,8 @@ def redis_tx_rate_limiter(redis, key_format):
 
 
 @pytest.fixture
-def redis_script_rate_limiter(redis, key_format):
+def redis_script_rate_limiter(redis, redis_version_check, key_format):
+    redis_version_check(RedisScriptRateLimiter.MIN_REDIS_VERSION)
     return RedisScriptRateLimiter(redis, key_format=key_format)
 
 

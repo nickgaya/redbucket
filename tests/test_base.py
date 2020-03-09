@@ -1,6 +1,7 @@
 from unittest.mock import NonCallableMock
 
 import pytest
+from redis import Redis
 
 from redbucket.base import RateLimiter, RedisRateLimiter
 from redbucket.data import RateLimit, Zone
@@ -63,6 +64,9 @@ def test_expiry_warning():
 
 
 class DummyRedisRateLimiter(RedisRateLimiter):
+
+    MIN_REDIS_VERSION = (1, 2)
+
     def _request(self, **keys):
         for lname in keys:
             self._rate_limits[lname]
@@ -71,7 +75,9 @@ class DummyRedisRateLimiter(RedisRateLimiter):
 
 @pytest.fixture
 def mock_redis():
-    return NonCallableMock(name='redis')
+    mock_redis = NonCallableMock(name='redis', spec=Redis)
+    mock_redis.info.return_value = {'redis_version': '2.6.17'}
+    return mock_redis
 
 
 @pytest.mark.parametrize('format_string', (
@@ -97,3 +103,15 @@ def test_invalid_key_format(mock_redis, format_string):
 ))
 def test_valid_key_format(mock_redis, format_string):
     DummyRedisRateLimiter(mock_redis, key_format=format_string)
+
+
+def test_version_check(mock_redis):
+    mock_redis.info.return_value = {'redis_version': '1.0.1'}
+
+    with pytest.raises(RuntimeError) as e:
+        DummyRedisRateLimiter(mock_redis)
+
+    assert str(e.value) == "Redis server has version 1.0.1. This " \
+        "implementation requires version 1.2 or greater."
+
+    mock_redis.info.assert_called_once_with('server')

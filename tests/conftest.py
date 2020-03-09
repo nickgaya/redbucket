@@ -3,6 +3,8 @@ import os
 import pytest
 from redis import Redis
 
+from redbucket.base import get_redis_version
+
 
 @pytest.fixture(scope='session')
 def redis():
@@ -18,3 +20,19 @@ def redis():
 def key_format(redis):
     id_ = redis.incr('rb:test_id')
     return f'rb:{id_}:{{zone}}:{{key}}'
+
+
+@pytest.fixture(scope='session')
+def redis_version(redis):
+    return get_redis_version(redis)
+
+
+@pytest.fixture(scope='session')
+def redis_version_check(redis_version):
+    def check(min_version):
+        if redis_version < min_version:
+            rv = '.'.join(map(str, redis_version))
+            mv = '.'.join(map(str, min_version))
+            pytest.skip(f"redis version {rv} < {mv}")
+
+    return check

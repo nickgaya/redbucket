@@ -10,12 +10,14 @@ from redbucket.transactional import RedisTransactionalRateLimiter
 
 @pytest.fixture(params=('tx-json', 'tx-struct',
                         'script-json', 'script-struct'))
-def rate_limiter(redis, key_format, request):
+def rate_limiter(redis, redis_version_check, key_format, request):
     impl, codec = request.param.split('-')
     cls = {
         'tx': RedisTransactionalRateLimiter,
         'script': RedisScriptRateLimiter,
     }[impl]
+    if cls.MIN_REDIS_VERSION:
+        redis_version_check(cls.MIN_REDIS_VERSION)
     return cls(redis, key_format=key_format, codec=codec)
 
 
@@ -82,7 +84,10 @@ def test_state_delay(redis, rate_limiter):
 
 
 @pytest.mark.parametrize('codec', ('json', 'struct'))
-def test_tx_script_interoperable(redis, key_format, codec):
+def test_tx_script_interoperable(
+        redis, redis_version_check, key_format, codec):
+
+    redis_version_check(RedisScriptRateLimiter.MIN_REDIS_VERSION)
     srl = RedisScriptRateLimiter(redis, key_format=key_format, codec=codec)
     trl = RedisTransactionalRateLimiter(redis, key_format=key_format,
                                         codec=codec)

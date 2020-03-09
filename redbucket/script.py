@@ -2,9 +2,9 @@
 
 import string
 import textwrap
-from typing import Any, List, Mapping, Optional, Tuple, Union
+from typing import Any, List, Mapping, Optional, Union
 
-from redis import Redis, ResponseError
+from redis import Redis
 from redis.client import Script
 
 from redbucket.base import RedisRateLimiter
@@ -81,6 +81,9 @@ class RedisScriptRateLimiter(RedisRateLimiter):
     atomically update zone state for each request.
     """
 
+    # Script effects replication was added in Redis 3.2
+    MIN_REDIS_VERSION = (3, 2)
+
     def __init__(self, redis: Redis,
                  key_format: str = 'redbucket:{zone}:{key}',
                  codec: Union[str, LuaCodec] = DEFAULT_CODEC) -> None:
@@ -95,21 +98,6 @@ class RedisScriptRateLimiter(RedisRateLimiter):
         super(RedisScriptRateLimiter, self).__init__(redis, key_format)
         self._codec: LuaCodec = \
             get_codec(codec) if isinstance(codec, str) else codec
-
-        # Script effects replication was added in Redis 3.2
-        version = self._redis_version()
-        if version < (3, 2):
-            raise RuntimeError(
-                f"Redis server has version {'.'.join(map(str, version))}. "
-                "This implementation requires version 3.2 or greater.")
-
-    def _redis_version(self) -> Tuple[int, ...]:
-        """Get version of Redis server."""
-        try:
-            info = self._redis.info('server')
-        except ResponseError:
-            info = self._redis.info()
-        return tuple(map(int, info['redis_version'].split('.')))
 
     def _configure(self, rate_limits: Mapping[str, RateLimit]) -> None:
         limits = '{' + ', '.join(

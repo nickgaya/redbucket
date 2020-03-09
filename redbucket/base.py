@@ -4,12 +4,12 @@ import math
 import warnings
 from abc import ABC, abstractmethod
 from string import Formatter
-from typing import Any, Mapping, Set
+from typing import Any, Mapping, Set, Tuple
 
-from redis import Redis
+from redis import Redis, ResponseError
 from redbucket.data import RateLimit, Response
 
-__all__ = ('RateLimiter', 'RedisRateLimiter')
+__all__ = ('RateLimiter', 'RedisRateLimiter', 'get_redis_version')
 
 
 class RateLimiter(ABC):
@@ -76,6 +76,8 @@ class RateLimiter(ABC):
 class RedisRateLimiter(RateLimiter):
     """Base class for Redis-based rate limiters."""
 
+    MIN_REDIS_VERSION: Tuple[int, ...] = ()
+
     def __init__(self, redis: Redis,
                  key_format: str = 'redbucket:{zone}:{key}') -> None:
         """
@@ -89,8 +91,32 @@ class RedisRateLimiter(RateLimiter):
         self._redis = redis
         self._key_format = _validate_key_format(key_format)
 
+        if self.MIN_REDIS_VERSION:
+            self._check_redis_version()
+
     def _redis_key(self, zone: Any, key: Any) -> str:
         return self._key_format.format(zone=zone, key=key)
+
+    def _redis_version(self):
+        return get_redis_version(self._redis)
+
+    def _check_redis_version(self):
+        version = self._redis_version()
+        if version < self.MIN_REDIS_VERSION:
+            server_version = '.'.join(map(str, version))
+            min_version = '.'.join(map(str, self.MIN_REDIS_VERSION))
+            raise RuntimeError(
+                f"Redis server has version {server_version}. This "
+                f"implementation requires version {min_version} or greater.")
+
+
+def get_redis_version(redis: Redis) -> Tuple[int, ...]:
+    """Query the Redis server version as a tuple of ints."""
+    try:
+        info = redis.info('server')
+    except ResponseError:
+        info = redis.info()
+    return tuple(map(int, info['redis_version'].split('.')))
 
 
 def _validate_key_format(format_string: str) -> str:

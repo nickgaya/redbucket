@@ -1,25 +1,42 @@
 #! /bin/bash
-# Script to start a Redis Docker container and run a command.
-# Sets the environment variables REDIS_HOST and REDIS_PORT.
+# Script to start a Redis Docker container.
+#
+# If given a command, starts a Redis container, runs the command with REDIS_URL
+# and REDIS_CONTAINER environment variables set, then stops the container.
+#
+# If run without a command, outputs statements to export the environment
+# variables.
 
 cleanup() {
-    docker stop "${container}" >/dev/null
+    docker stop "${container}" &>/dev/null
+}
+
+abort() {
+    for arg in "$@"; do
+        echo "$arg"
+    done >&2
+    exit 1
 }
 
 set -eu
 
-if [ $# -lt 2 ]; then
-    echo "Usage: $0 [IMAGE:]TAG COMMAND [...]" >&2
-    exit 1
-fi
+USAGE="usage: $0 [-i IMAGE | -t TAG] [-n NAME] [command ...]"
 
-image="${1}"
-if [[ "${image}" != *:* ]]; then
-    image="redis:${image}"
-fi
-shift
+image='redis:alpine'
+name='redis'
+while getopts ':ht:i:n:' opt; do
+    case "$opt" in
+        t)  image="redis:${OPTARG}" ;;
+        i)  image="${OPTARG}" ;;
+        n)  name="${OPTARG}" ;;
+        :)  abort "-${OPTARG} requires an argument" "${USAGE}" ;;
+        \?) abort "invalid option: -${OPTARG}" "${USAGE}" ;;
+        *)  abort "${USAGE}" ;;
+    esac
+done
+shift $((OPTIND - 1))
 
-container="$(docker run --rm -d -p127.0.0.1::6379 --name=redis "${image}")"
+container="$(docker run --rm -d -p127.0.0.1::6379 --name="${name}" "${image}")"
 trap cleanup EXIT
 
 # Wait for Redis to start
@@ -35,10 +52,18 @@ if ! docker exec "${container}" redis-cli ping >/dev/null 2>&1; then
     exit 1
 fi
 
-hp="$(docker port "${container}" 6379)"
-port="${hp##*:}"
+host="$(docker port "${container}" 6379)"
+port="${host##*:}"
+redis_url="redis://localhost:${port}"
 echo "Redis container started: id=${container:0:12}, port=${port}" >&2
 
-# Set envvars and execute command
-export REDIS_URL="redis://localhost:${port}"
-"${@}"
+if [ $# -eq 0 ]; then
+    printf "export REDIS_CONTAINER=%q\n" "${container}"
+    printf "export REDIS_URL=%q\n" "${redis_url}"
+    trap - EXIT
+    exit 0
+else
+    export REDIS_CONTAINER="${container}"
+    export REDIS_URL="${redis_url}"
+    "${@}"
+fi

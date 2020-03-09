@@ -181,8 +181,16 @@ connect to port 6379 of localhost. This can be overridden by setting the
     export REDIS_URL=redis://localhost:6379
 
 To start a Redis Docker container for running the tests, you can use the
-*docker_redis.sh* script. The script expects an argument specifying the Docker
-tag or repository, followed by the command to execute. For example, to run the
-tests with the `redis:alpine` image, use:
+*docker_redis.sh* script. For example, to run the tests against a Docker redis
+instance, you can run:
 
-    docker_redis.sh alpine tox
+    ./docker_redis.sh tox
+
+You can also run the script without a command and execute output to set
+environment variables in your current shell.
+
+    eval "$(./docker_redis.sh)"
+
+By default, the script uses the `redis:alpine` image. You can supply a
+different tag for the `redis` image with the `-t` flag, or a different image
+name with `-i`.
